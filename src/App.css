@@ -1,0 +1,5 @@
+#root{
+  width: 100%;
+  height: 100vh;
+  background: radial-gradient(circle, rgba(255, 242, 0, 1) 0%, rgba(189, 146, 19, 1) 46%, rgba(227, 15, 255, 1) 100%);
+}
