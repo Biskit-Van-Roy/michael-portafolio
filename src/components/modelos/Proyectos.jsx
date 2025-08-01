@@ -1,35 +1,30 @@
 import React, { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useScroll, Sparkles } from "@react-three/drei";
 import * as THREE from "three";
 
-export function Proyectos() {
-  const scroll = useScroll();
+export function Proyectos({ baseHueColor = "#39FF14" }) {
   const sphereRef = useRef();
-  const sparklesRef = useRef();
   const shaderRef = useRef();
-  const colorStart = useMemo(() => new THREE.Color("#FFFFFF"), []);
-  const colorEnd = useMemo(() => new THREE.Color("#FFFFFF"), []);
-  const uniforms = useMemo( 
-    () => ({
-      uColorTop: { value: colorStart.clone() },
-      uColorBottom: { value: colorEnd.clone() },
-    }),
-    [colorStart, colorEnd]
-  );
-  useFrame((_, delta) => {    
-    if (sphereRef.current) sphereRef.current.rotation.y += 0.005 * delta;
-    if (sparklesRef.current) sparklesRef.current.rotation.y += 0.002 * delta;
-    const t = scroll.offset ?? 0;
-    uniforms.uColorTop.value
-      .copy(colorStart)
-      .lerp(new THREE.Color("#0084FF"), t);
-    uniforms.uColorBottom.value
-      .copy(colorEnd)
-      .lerp(new THREE.Color("#F107F1"), t);
-    if (sparklesRef.current) {
-      sparklesRef.current.position.z = -t * 10; // Puedes ajustar -10 según lo que necesites
-    }
+
+  const hueColor = useMemo(() => new THREE.Color(baseHueColor), [baseHueColor]);
+
+  const uniforms = useMemo(() => ({
+    uTime: { value: 0 },
+    uColors: {
+      value: [
+        new THREE.Color("#000000"),
+        new THREE.Color("#4B0082"),
+        hueColor.clone().lerp(new THREE.Color("#FF00FF"), 0.8), // mezcla aurora
+        new THREE.Color("#00FF88"),
+        new THREE.Color("#000000"),
+        new THREE.Color("#00CFFF"),      // azul
+      ],
+    },
+  }), [hueColor]);
+
+  useFrame((state) => {
+    uniforms.uTime.value = state.clock.elapsedTime;
+    if (sphereRef.current) sphereRef.current.rotation.y += 0.001;
   });
 
   return (
@@ -50,16 +45,45 @@ export function Proyectos() {
           `}
           fragmentShader={`
             varying vec3 vPosition;
-            uniform vec3 uColorTop;
-            uniform vec3 uColorBottom;
+            uniform float uTime;
+            uniform vec3 uColors[5];
+
+            // Simple noise function
+            float noise(vec2 p) {
+              return fract(sin(dot(p ,vec2(12.9898,78.233))) * 43758.5453);
+            }
+
             void main() {
-              float mixFactor = (vPosition.y + 1.0) / 2.0;
-              gl_FragColor = vec4(mix(uColorBottom, uColorTop, mixFactor), 1.0);
+              float y = (vPosition.y + 1.0) / 2.0;
+
+              // Movimiento tipo aurora
+              float aurora = sin(vPosition.x * 10.0 + uTime * 0.5) * 0.5 + 0.5;
+              aurora *= sin(vPosition.y * 15.0 + uTime * 0.8) * 0.5 + 0.5;
+              aurora *= noise(vPosition.xz * 5.0 + uTime * 0.2);
+
+              vec3 color;
+
+              if (y < 0.25) {
+                float t = y / 0.25;
+                color = mix(uColors[0], uColors[1], t);
+              } else if (y < 0.5) {
+                float t = (y - 0.25) / 0.25;
+                color = mix(uColors[1], uColors[2], t);
+              } else if (y < 0.75) {
+                float t = (y - 0.5) / 0.25;
+                color = mix(uColors[2], uColors[3], t);
+              } else {
+                float t = (y - 0.75) / 0.25;
+                color = mix(uColors[3], uColors[4], t);
+              }
+
+              color += aurora * 0.5;
+
+              gl_FragColor = vec4(color, 1.0);
             }
           `}
         />
       </mesh>
-
     </group>
   );
 }
